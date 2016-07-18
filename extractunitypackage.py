@@ -33,7 +33,7 @@ outputDir = ''
 if len(sys.argv) > 2:
 	outputDir = os.path.join(sys.argv[2], name)
 else:
-	outputDir = './' + name
+	outputDir = os.path.join('./', name)
 workingDir = './.working'
 
 # can't proceed if the output dir exists already
