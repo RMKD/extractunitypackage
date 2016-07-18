@@ -27,7 +27,7 @@ if len(sys.argv) < 2:
 	print ('No input file specified.')
 	sys.exit()
 
-name, extension = os.path.splitext(sys.argv[1])
+name, extension = os.path.splitext(os.path.basename(sys.argv[1]))
 
 outputDir = ''
 if len(sys.argv) > 2:
