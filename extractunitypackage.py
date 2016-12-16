@@ -31,7 +31,7 @@ name, extension = os.path.splitext(os.path.basename(sys.argv[1]))
 
 outputDir = ''
 if len(sys.argv) > 2:
-	outputDir = os.path.join(sys.argv[2], name)
+	outputDir = sys.argv[2]
 else:
 	outputDir = os.path.join('.', name)
 workingDir = os.path.join('.', '.working')
