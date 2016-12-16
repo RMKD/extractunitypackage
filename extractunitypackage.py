@@ -49,6 +49,10 @@ tar = tarfile.open(sys.argv[1], 'r:gz')
 tar.extractall(workingDir);
 tar.close()
 
+
+os.makedirs(outputDir)
+
+
 # build association between the unitypackage's root directory names
 # (which each have 1 asset in them) to the actual filename (stored in the 'pathname' file)
 mapping = {}
@@ -62,6 +66,7 @@ for i in os.listdir(workingDir):
 		# we need to check if an 'asset' file exists (sometimes it won't be there
 		# such as when the 'pathname' file is just specifying a directory)
 		hasAsset = False
+		hasMeta = False
 
 		for j in os.listdir(rootFile):
 			# grab the real path
@@ -70,37 +75,40 @@ for i in os.listdir(workingDir):
 				realPath = lines[0]     # should always be on the first line
 			elif j == 'asset':
 				hasAsset = True
+			elif j == 'asset.meta':
+				hasMeta = True
 
 		# if an 'asset' file exists in this directory, then this directory
 		# contains a file that should be moved+renamed. otherwise we can
 		# ignore this directory altogether...
-		if hasAsset:
-			mapping[asset] = realPath
+		if hasAsset or hasMeta:
+			path, filename = os.path.split(realPath)
 
-# mapping from unitypackage internal filenames to real filenames is now built
-# walk through them all and move the 'asset' files out and rename, building
-# the directory structure listed in the real filenames we found as we go
+			destDir = os.path.join(outputDir, path)
+			if not os.path.exists(destDir):
+				os.makedirs(destDir)
 
-os.makedirs(outputDir)
+			if hasAsset:
+				destFile = os.path.join(destDir, filename)
+				source = os.path.join(workingDir, asset, 'asset');
+				print ('Move ' + source + ' => ' + destFile)
+				shutil.move(source, destFile)
+				# change file permissions for unix because under mac os x
+				# (perhaps also other unix systems) all files are marked as executable
+				# for safety reasons os x prevent the access to the extracted files
+				os.chmod(destFile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
-for asset in mapping:
-	path, filename = os.path.split(mapping[asset])
+			if hasMeta:
+				destFileMeta = os.path.join(destDir, filename + '.meta')
+				sourceMeta = os.path.join(workingDir, asset, 'asset.meta');
+				print ('Move ' + sourceMeta + ' => ' + destFileMeta)
+				shutil.move(sourceMeta, destFileMeta)
+				# change file permissions for unix because under mac os x
+				# (perhaps also other unix systems) all files are marked as executable
+				# for safety reasons os x prevent the access to the extracted files
+				os.chmod(destFileMeta, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
 
-	destDir = os.path.join(outputDir, path)
-	destFile = os.path.join(destDir, filename)
-	source = os.path.join(workingDir, asset, 'asset');
-
-	if not os.path.exists(destDir):
-		os.makedirs(destDir)
-
-	shutil.move(source, destFile)
-	
-	# change file permissions for unix because under mac os x 
-	# (perhaps also other unix systems) all files are marked as executable
-	# for safety reasons os x prevent the access to the extracted files
-	os.chmod(destFile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-	
-	print (asset + ' => ' + mapping[asset])
+			print (asset + ' => ' + realPath)
 
 # done, cleanup any leftovers...
 shutil.rmtree(workingDir)
