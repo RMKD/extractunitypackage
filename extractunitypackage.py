@@ -33,8 +33,8 @@ outputDir = ''
 if len(sys.argv) > 2:
 	outputDir = os.path.join(sys.argv[2], name)
 else:
-	outputDir = os.path.join('./', name)
-workingDir = './.working'
+	outputDir = os.path.join('.', name)
+workingDir = os.path.join('.', '.working')
 
 # can't proceed if the output dir exists already
 # but if the temp working dir exists, we clean it out before extracting
@@ -72,7 +72,7 @@ for i in os.listdir(workingDir):
 			# grab the real path
 			if j == 'pathname':
 				lines = [line.strip() for line in open(os.path.join(rootFile, j))]
-				realPath = lines[0]     # should always be on the first line
+				realPath = os.path.normpath(lines[0])     # should always be on the first line
 			elif j == 'asset':
 				hasAsset = True
 			elif j == 'asset.meta':
