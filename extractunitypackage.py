@@ -23,92 +23,98 @@ import shutil
 import sys
 import tarfile
 
-if len(sys.argv) < 2:
-	print ('No input file specified.')
-	sys.exit()
+def extractunitypackage(inputFile, outputDir):
+	workingDir = os.path.join('.', '.working')
 
-name, extension = os.path.splitext(os.path.basename(sys.argv[1]))
+	# can't proceed if the output dir exists already
+	# but if the temp working dir exists, we clean it out before extracting
+	if os.path.exists(outputDir):
+		print ('Output dir "' + outputDir + '" exists. Aborting.')
+		return
+	if os.path.exists(workingDir):
+		shutil.rmtree(workingDir)
 
-outputDir = ''
-if len(sys.argv) > 2:
-	outputDir = sys.argv[2]
-else:
-	outputDir = os.path.join('.', name)
-workingDir = os.path.join('.', '.working')
+	# extract .unitypackage contents to a temporary space
+	tar = tarfile.open(inputFile, 'r:gz')
+	tar.extractall(workingDir);
+	tar.close()
 
-# can't proceed if the output dir exists already
-# but if the temp working dir exists, we clean it out before extracting
-if os.path.exists(outputDir):
-	print ('Output dir "' + outputDir + '" exists. Aborting.')
-	sys.exit();
-if os.path.exists(workingDir):
+
+	os.makedirs(outputDir)
+
+
+	# build association between the unitypackage's root directory names
+	# (which each have 1 asset in them) to the actual filename (stored in the 'pathname' file)
+	mapping = {}
+	for i in os.listdir(workingDir):
+		rootFile = os.path.join(workingDir, i)
+		asset = i
+
+		if os.path.isdir(rootFile):
+			realPath = ''
+
+			# we need to check if an 'asset' file exists (sometimes it won't be there
+			# such as when the 'pathname' file is just specifying a directory)
+			hasAsset = False
+			hasMeta = False
+
+			for j in os.listdir(rootFile):
+				# grab the real path
+				if j == 'pathname':
+					lines = [line.strip() for line in open(os.path.join(rootFile, j))]
+					realPath = os.path.normpath(lines[0])     # should always be on the first line
+				elif j == 'asset':
+					hasAsset = True
+				elif j == 'asset.meta':
+					hasMeta = True
+
+			# if an 'asset' file exists in this directory, then this directory
+			# contains a file that should be moved+renamed. otherwise we can
+			# ignore this directory altogether...
+			if hasAsset or hasMeta:
+				path, filename = os.path.split(realPath)
+
+				destDir = os.path.join(outputDir, path)
+				if not os.path.exists(destDir):
+					os.makedirs(destDir)
+
+				if hasAsset:
+					destFile = os.path.join(destDir, filename)
+					source = os.path.join(workingDir, asset, 'asset');
+					print ('Move ' + source + ' => ' + destFile)
+					shutil.move(source, destFile)
+					# change file permissions for unix because under mac os x
+					# (perhaps also other unix systems) all files are marked as executable
+					# for safety reasons os x prevent the access to the extracted files
+					os.chmod(destFile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+				if hasMeta:
+					destFileMeta = os.path.join(destDir, filename + '.meta')
+					sourceMeta = os.path.join(workingDir, asset, 'asset.meta');
+					print ('Move ' + sourceMeta + ' => ' + destFileMeta)
+					shutil.move(sourceMeta, destFileMeta)
+					# change file permissions for unix because under mac os x
+					# (perhaps also other unix systems) all files are marked as executable
+					# for safety reasons os x prevent the access to the extracted files
+					os.chmod(destFileMeta, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+
+				print (asset + ' => ' + realPath)
+
+	# done, cleanup any leftovers...
 	shutil.rmtree(workingDir)
 
-# extract .unitypackage contents to a temporary space
-tar = tarfile.open(sys.argv[1], 'r:gz')
-tar.extractall(workingDir);
-tar.close()
 
+if __name__ == "__main__":
+	if len(sys.argv) < 2:
+		print ('No input file specified.')
+		sys.exit()
 
-os.makedirs(outputDir)
+	name, extension = os.path.splitext(os.path.basename(sys.argv[1]))
 
+	outputDir = ''
+	if len(sys.argv) > 2:
+		outputDir = sys.argv[2]
+	else:
+		outputDir = os.path.join('.', name)
 
-# build association between the unitypackage's root directory names
-# (which each have 1 asset in them) to the actual filename (stored in the 'pathname' file)
-mapping = {}
-for i in os.listdir(workingDir):
-	rootFile = os.path.join(workingDir, i)
-	asset = i
-
-	if os.path.isdir(rootFile):
-		realPath = ''
-
-		# we need to check if an 'asset' file exists (sometimes it won't be there
-		# such as when the 'pathname' file is just specifying a directory)
-		hasAsset = False
-		hasMeta = False
-
-		for j in os.listdir(rootFile):
-			# grab the real path
-			if j == 'pathname':
-				lines = [line.strip() for line in open(os.path.join(rootFile, j))]
-				realPath = os.path.normpath(lines[0])     # should always be on the first line
-			elif j == 'asset':
-				hasAsset = True
-			elif j == 'asset.meta':
-				hasMeta = True
-
-		# if an 'asset' file exists in this directory, then this directory
-		# contains a file that should be moved+renamed. otherwise we can
-		# ignore this directory altogether...
-		if hasAsset or hasMeta:
-			path, filename = os.path.split(realPath)
-
-			destDir = os.path.join(outputDir, path)
-			if not os.path.exists(destDir):
-				os.makedirs(destDir)
-
-			if hasAsset:
-				destFile = os.path.join(destDir, filename)
-				source = os.path.join(workingDir, asset, 'asset');
-				print ('Move ' + source + ' => ' + destFile)
-				shutil.move(source, destFile)
-				# change file permissions for unix because under mac os x
-				# (perhaps also other unix systems) all files are marked as executable
-				# for safety reasons os x prevent the access to the extracted files
-				os.chmod(destFile, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-
-			if hasMeta:
-				destFileMeta = os.path.join(destDir, filename + '.meta')
-				sourceMeta = os.path.join(workingDir, asset, 'asset.meta');
-				print ('Move ' + sourceMeta + ' => ' + destFileMeta)
-				shutil.move(sourceMeta, destFileMeta)
-				# change file permissions for unix because under mac os x
-				# (perhaps also other unix systems) all files are marked as executable
-				# for safety reasons os x prevent the access to the extracted files
-				os.chmod(destFileMeta, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
-
-			print (asset + ' => ' + realPath)
-
-# done, cleanup any leftovers...
-shutil.rmtree(workingDir)
+	extractunitypackage(sys.argv[1], outputDir)
